@@ -160,3 +160,110 @@ export interface ReportFilter {
   healthWorker?: string;
   reportType: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual';
 }
+
+// ── Household Visit Report ──────────────────────────────────────────────────
+
+export type VisitStatus = 'draft' | 'submitted' | 'approved' | 'returned';
+export type RiskPriority = 'high' | 'medium';
+export type YesNo = 'yes' | 'no';
+export type YesNoNA = 'yes' | 'no' | 'na';
+export type EarlyStimulationScore = 0 | 1 | 2; // 0=Never, 1=Sometimes, 2=Yes
+export type NutritionalStatusVisit = 'sam' | 'mam' | 'n' | 'na';
+export type MilestoneStatus = 'n' | 'sd' | 'dd'; // Normal, Suspected Delay, Developmental Delay
+export type DisabilityCategory = 'md' | 'hd' | 'vd' | 'pd' | 'pp' | 'nd';
+export type MaternalVisitStatus = 'p' | 'pn' | 'l'; // Pregnant, Postnatal, Lactating
+
+export interface RiskFlag {
+  type: 'sam' | 'mam' | 'depression' | 'violence' | 'child_violence' | 'developmental_delay';
+  priority: RiskPriority;
+  description: string;
+  relatedRecordId: string;
+}
+
+export interface MaternalVisitSection {
+  maternalRecordId: string;
+  maternalStatus: MaternalVisitStatus;
+  ancPncFollowUpStarted: YesNoNA;
+  ancFollowUpDropped: YesNoNA;
+  substanceUse: YesNo;
+  substanceSpecification?: string;
+  signsOfDepression: YesNo;
+  diverseDietExtraMeal: YesNo;
+  ironFolicAcid: YesNoNA;
+  partnerFamilySupport: YesNo;
+  signsOfViolence: YesNo;
+  earlyStimulation?: {
+    talkingSinging: YesNo;
+    fetalMovementMonitoring: YesNo;
+    bellyMassage: YesNo;
+  };
+  referred: YesNo;
+  referralReasons?: Array<'anc' | 'pnc' | 'depression' | 'violence'>;
+  nextAppointmentDate: string;
+}
+
+export interface ChildVisitSection {
+  childRecordId: string;
+  earlyStimulation: {
+    talksSings: EarlyStimulationScore;
+    plays: EarlyStimulationScore;
+    tellsStoriesReads: EarlyStimulationScore;
+    playsOutdoors: EarlyStimulationScore;
+  };
+  understandsChildNeeds: YesNo;
+  positiveDiscipline: YesNo;
+  vaccinationUpToDate: YesNoNA;
+  feedingPractice: {
+    exclusiveBreastfeeding: YesNo;
+    complementaryFeeding: YesNo;
+    balancedDiet: YesNo;
+  };
+  nutritionalStatus: NutritionalStatusVisit;
+  signsOfAbuseViolence: YesNo;
+  abuseSpecification?: string;
+  hasToy: YesNo;
+  toyType?: 'homemade' | 'purchased';
+  referred: YesNo;
+  referralReasons?: Array<'vitamin_a' | 'deworming' | 'malnutrition' | 'developmental_delay' | 'abuse_violence' | 'hospital' | 'other'>;
+  referralOtherSpecification?: string;
+  nextAppointmentDate: string;
+  milestoneAssessment?: Record<string, MilestoneStatus>;
+  disabilityCategories: DisabilityCategory[];
+  riskFactorsForDevelopment: YesNo;
+}
+
+export interface VisitReport {
+  id: string;
+  householdId: string;
+  visitNumber: number;
+  visitDate: string;
+  status: VisitStatus;
+  vulnerabilityStatus: YesNo;
+  psnpEnrollment: YesNo;
+  cbhiStatus: 'free' | 'paid' | 'no';
+  tdsStatus: YesNo;
+  maternalSection?: MaternalVisitSection;
+  childSections: ChildVisitSection[];
+  riskFlags: RiskFlag[];
+  hewId: string;
+  submittedAt?: string;
+  supervisorId?: string;
+  approvedAt?: string;
+  returnedAt?: string;
+  supervisorComment?: string;
+  draftSavedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  recipientUserId: string;
+  type: 'submission' | 'approval' | 'returned' | 'risk_flag' | 'visit_reminder' | 'resubmit_reminder';
+  title: string;
+  message: string;
+  relatedReportId?: string;
+  isRead: boolean;
+  isUrgent: boolean;
+  createdAt: string;
+}

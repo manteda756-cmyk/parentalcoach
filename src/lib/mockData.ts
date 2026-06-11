@@ -1,6 +1,7 @@
 import type {
   User, Household, MaternalRecord, ChildRecord,
-  Referral, Appointment, DashboardStats
+  Referral, Appointment, DashboardStats,
+  VisitReport, Notification, MaternalVisitSection, ChildVisitSection, RiskFlag
 } from '@/types';
 
 export const mockUsers: User[] = [
@@ -198,4 +199,285 @@ export const riskDistributionData = [
   { name: 'Low Risk', value: 58, color: '#00B894' },
   { name: 'Medium Risk', value: 28, color: '#FDCB6E' },
   { name: 'High Risk', value: 14, color: '#E17055' },
+];
+
+// ── Visit Report Mock Data ──────────────────────────────────────────────────
+
+export function computeRiskFlags(
+  maternal?: MaternalVisitSection,
+  children: ChildVisitSection[] = []
+): RiskFlag[] {
+  const flags: RiskFlag[] = [];
+  if (maternal?.signsOfDepression === 'yes')
+    flags.push({ type: 'depression', priority: 'high', description: 'Signs of maternal depression recorded', relatedRecordId: maternal.maternalRecordId });
+  if (maternal?.signsOfViolence === 'yes')
+    flags.push({ type: 'violence', priority: 'high', description: 'Signs of violence recorded for mother', relatedRecordId: maternal.maternalRecordId });
+  for (const child of children) {
+    if (child.nutritionalStatus === 'sam')
+      flags.push({ type: 'sam', priority: 'high', description: 'Severe Acute Malnutrition (SAM) detected', relatedRecordId: child.childRecordId });
+    if (child.nutritionalStatus === 'mam')
+      flags.push({ type: 'mam', priority: 'medium', description: 'Moderate Acute Malnutrition (MAM) detected', relatedRecordId: child.childRecordId });
+    if (child.signsOfAbuseViolence === 'yes')
+      flags.push({ type: 'child_violence', priority: 'high', description: 'Signs of abuse or violence recorded for child', relatedRecordId: child.childRecordId });
+    for (const [, status] of Object.entries(child.milestoneAssessment ?? {}))
+      if (status === 'dd')
+        flags.push({ type: 'developmental_delay', priority: 'medium', description: 'Developmental Delay (DD) recorded', relatedRecordId: child.childRecordId });
+  }
+  return flags;
+}
+
+export function getVisitReportsForHousehold(householdId: string): VisitReport[] {
+  return mockVisitReports
+    .filter(r => r.householdId === householdId)
+    .sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime());
+}
+
+export function getNextVisitNumber(householdId: string): number {
+  const reports = mockVisitReports.filter(r => r.householdId === householdId);
+  return reports.length + 1;
+}
+
+export function getSubmittedReportsForSupervisor(_supervisorId: string): VisitReport[] {
+  return mockVisitReports
+    .filter(r => r.status === 'submitted')
+    .sort((a, b) => new Date(a.submittedAt ?? a.createdAt).getTime() - new Date(b.submittedAt ?? b.createdAt).getTime());
+}
+
+const maternalSection1: MaternalVisitSection = {
+  maternalRecordId: 'm2',
+  maternalStatus: 'p',
+  ancPncFollowUpStarted: 'yes',
+  ancFollowUpDropped: 'no',
+  substanceUse: 'no',
+  signsOfDepression: 'yes',
+  diverseDietExtraMeal: 'no',
+  ironFolicAcid: 'yes',
+  partnerFamilySupport: 'no',
+  signsOfViolence: 'no',
+  earlyStimulation: { talkingSinging: 'yes', fetalMovementMonitoring: 'yes', bellyMassage: 'no' },
+  referred: 'yes',
+  referralReasons: ['depression'],
+  nextAppointmentDate: '2024-07-15',
+};
+
+const childSection1: ChildVisitSection = {
+  childRecordId: 'c2',
+  earlyStimulation: { talksSings: 1, plays: 1, tellsStoriesReads: 0, playsOutdoors: 1 },
+  understandsChildNeeds: 'yes',
+  positiveDiscipline: 'yes',
+  vaccinationUpToDate: 'no',
+  feedingPractice: { exclusiveBreastfeeding: 'yes', complementaryFeeding: 'no', balancedDiet: 'no' },
+  nutritionalStatus: 'sam',
+  signsOfAbuseViolence: 'no',
+  hasToy: 'no',
+  referred: 'yes',
+  referralReasons: ['malnutrition'],
+  nextAppointmentDate: '2024-07-10',
+  disabilityCategories: [],
+  riskFactorsForDevelopment: 'no',
+};
+
+const childSection2: ChildVisitSection = {
+  childRecordId: 'c3',
+  earlyStimulation: { talksSings: 2, plays: 2, tellsStoriesReads: 1, playsOutdoors: 2 },
+  understandsChildNeeds: 'yes',
+  positiveDiscipline: 'yes',
+  vaccinationUpToDate: 'yes',
+  feedingPractice: { exclusiveBreastfeeding: 'no', complementaryFeeding: 'yes', balancedDiet: 'yes' },
+  nutritionalStatus: 'mam',
+  signsOfAbuseViolence: 'no',
+  hasToy: 'yes',
+  toyType: 'homemade',
+  referred: 'yes',
+  referralReasons: ['malnutrition'],
+  nextAppointmentDate: '2024-07-20',
+  disabilityCategories: [],
+  riskFactorsForDevelopment: 'no',
+};
+
+const childSection3: ChildVisitSection = {
+  childRecordId: 'c1',
+  earlyStimulation: { talksSings: 2, plays: 2, tellsStoriesReads: 2, playsOutdoors: 2 },
+  understandsChildNeeds: 'yes',
+  positiveDiscipline: 'yes',
+  vaccinationUpToDate: 'yes',
+  feedingPractice: { exclusiveBreastfeeding: 'no', complementaryFeeding: 'yes', balancedDiet: 'yes' },
+  nutritionalStatus: 'n',
+  signsOfAbuseViolence: 'no',
+  hasToy: 'yes',
+  toyType: 'purchased',
+  referred: 'no',
+  nextAppointmentDate: '2024-08-01',
+  disabilityCategories: [],
+  riskFactorsForDevelopment: 'no',
+};
+
+const maternalSection2: MaternalVisitSection = {
+  maternalRecordId: 'm1',
+  maternalStatus: 'p',
+  ancPncFollowUpStarted: 'yes',
+  ancFollowUpDropped: 'no',
+  substanceUse: 'no',
+  signsOfDepression: 'no',
+  diverseDietExtraMeal: 'yes',
+  ironFolicAcid: 'yes',
+  partnerFamilySupport: 'yes',
+  signsOfViolence: 'no',
+  earlyStimulation: { talkingSinging: 'yes', fetalMovementMonitoring: 'yes', bellyMassage: 'yes' },
+  referred: 'no',
+  nextAppointmentDate: '2024-07-10',
+};
+
+export const mockVisitReports: VisitReport[] = [
+  {
+    id: 'vr1',
+    householdId: 'h2',
+    visitNumber: 3,
+    visitDate: '2024-06-20',
+    status: 'submitted',
+    vulnerabilityStatus: 'yes',
+    psnpEnrollment: 'yes',
+    cbhiStatus: 'free',
+    tdsStatus: 'no',
+    maternalSection: maternalSection1,
+    childSections: [childSection1],
+    riskFlags: computeRiskFlags(maternalSection1, [childSection1]),
+    hewId: 'u3',
+    submittedAt: '2024-06-20T14:30:00Z',
+    createdAt: '2024-06-20T10:00:00Z',
+    updatedAt: '2024-06-20T14:30:00Z',
+  },
+  {
+    id: 'vr2',
+    householdId: 'h3',
+    visitNumber: 2,
+    visitDate: '2024-06-18',
+    status: 'approved',
+    vulnerabilityStatus: 'no',
+    psnpEnrollment: 'no',
+    cbhiStatus: 'paid',
+    tdsStatus: 'no',
+    childSections: [childSection2],
+    riskFlags: computeRiskFlags(undefined, [childSection2]),
+    hewId: 'u4',
+    submittedAt: '2024-06-18T15:00:00Z',
+    supervisorId: 'u2',
+    approvedAt: '2024-06-19T09:00:00Z',
+    createdAt: '2024-06-18T11:00:00Z',
+    updatedAt: '2024-06-19T09:00:00Z',
+  },
+  {
+    id: 'vr3',
+    householdId: 'h1',
+    visitNumber: 4,
+    visitDate: '2024-06-22',
+    status: 'draft',
+    vulnerabilityStatus: 'no',
+    psnpEnrollment: 'no',
+    cbhiStatus: 'no',
+    tdsStatus: 'no',
+    maternalSection: maternalSection2,
+    childSections: [childSection3],
+    riskFlags: [],
+    hewId: 'u3',
+    draftSavedAt: '2024-06-22T11:00:00Z',
+    createdAt: '2024-06-22T10:30:00Z',
+    updatedAt: '2024-06-22T11:00:00Z',
+  },
+  {
+    id: 'vr4',
+    householdId: 'h5',
+    visitNumber: 1,
+    visitDate: '2024-06-15',
+    status: 'returned',
+    vulnerabilityStatus: 'yes',
+    psnpEnrollment: 'yes',
+    cbhiStatus: 'free',
+    tdsStatus: 'yes',
+    childSections: [],
+    riskFlags: [],
+    hewId: 'u3',
+    submittedAt: '2024-06-15T16:00:00Z',
+    supervisorId: 'u2',
+    returnedAt: '2024-06-16T09:00:00Z',
+    supervisorComment: 'Please complete the child section for Saron Yonas and resubmit.',
+    createdAt: '2024-06-15T13:00:00Z',
+    updatedAt: '2024-06-16T09:00:00Z',
+  },
+  {
+    id: 'vr5',
+    householdId: 'h4',
+    visitNumber: 2,
+    visitDate: '2024-06-10',
+    status: 'approved',
+    vulnerabilityStatus: 'no',
+    psnpEnrollment: 'no',
+    cbhiStatus: 'paid',
+    tdsStatus: 'no',
+    childSections: [],
+    riskFlags: [],
+    hewId: 'u4',
+    submittedAt: '2024-06-10T15:30:00Z',
+    supervisorId: 'u2',
+    approvedAt: '2024-06-11T10:00:00Z',
+    createdAt: '2024-06-10T12:00:00Z',
+    updatedAt: '2024-06-11T10:00:00Z',
+  },
+];
+
+export const mockNotifications: Notification[] = [
+  {
+    id: 'n1',
+    recipientUserId: 'u2',
+    type: 'submission',
+    title: 'New Visit Report Submitted',
+    message: 'Abebe Girma submitted a visit report for household HH-2024-002.',
+    relatedReportId: 'vr1',
+    isRead: false,
+    isUrgent: true,
+    createdAt: '2024-06-20T14:31:00Z',
+  },
+  {
+    id: 'n2',
+    recipientUserId: 'u2',
+    type: 'risk_flag',
+    title: 'Urgent: High-Risk Flags Detected',
+    message: 'Visit report for HH-2024-002 contains high-priority risk flags: SAM and maternal depression.',
+    relatedReportId: 'vr1',
+    isRead: false,
+    isUrgent: true,
+    createdAt: '2024-06-20T14:31:00Z',
+  },
+  {
+    id: 'n3',
+    recipientUserId: 'u3',
+    type: 'returned',
+    title: 'Visit Report Returned for Correction',
+    message: 'Your visit report for HH-2024-005 was returned. Comment: Please complete the child section for Saron Yonas and resubmit.',
+    relatedReportId: 'vr4',
+    isRead: false,
+    isUrgent: false,
+    createdAt: '2024-06-16T09:01:00Z',
+  },
+  {
+    id: 'n4',
+    recipientUserId: 'u4',
+    type: 'approval',
+    title: 'Visit Report Approved',
+    message: 'Your visit report for HH-2024-003 has been approved by Tigist Haile.',
+    relatedReportId: 'vr2',
+    isRead: true,
+    isUrgent: false,
+    createdAt: '2024-06-19T09:01:00Z',
+  },
+  {
+    id: 'n5',
+    recipientUserId: 'u3',
+    type: 'visit_reminder',
+    title: 'Upcoming Visit Due',
+    message: 'Household HH-2024-001 is due for a visit within 2 days.',
+    isRead: false,
+    isUrgent: false,
+    createdAt: '2024-06-23T08:00:00Z',
+  },
 ];
