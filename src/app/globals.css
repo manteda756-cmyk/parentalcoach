@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #0F6CBD;
+  --secondary: #00B894;
+  --accent: #FDCB6E;
+  --background: #F8FAFC;
+  --card: #FFFFFF;
+  --danger: #E17055;
+  --warning: #FDCB6E;
+  --success: #00B894;
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --border: #E2E8F0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 font-medium text-sm;
+}
+
+.sidebar-link.active {
+  @apply bg-blue-600 text-white shadow-md;
+}
+
+.kpi-card {
+  @apply bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow duration-200;
+}
+
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors duration-200 flex items-center gap-2 text-sm;
+}
+
+.btn-secondary {
+  @apply bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors duration-200 flex items-center gap-2 text-sm;
+}
+
+.btn-outline {
+  @apply border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-semibold px-5 py-2.5 rounded-xl transition-colors duration-200 flex items-center gap-2 text-sm;
+}
+
+.form-input {
+  @apply w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all;
+}
+
+.form-label {
+  @apply block text-sm font-semibold text-slate-700 mb-1.5;
+}
+
+.badge-risk-high {
+  @apply bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.badge-risk-medium {
+  @apply bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.badge-risk-low {
+  @apply bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.badge-status-pending {
+  @apply bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.badge-status-active {
+  @apply bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.badge-status-completed {
+  @apply bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.table-header {
+  @apply bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider;
+}
+
+.page-title {
+  @apply text-2xl font-bold text-slate-800;
+}
+
+.section-card {
+  @apply bg-white rounded-2xl shadow-sm border border-slate-100 p-6;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
