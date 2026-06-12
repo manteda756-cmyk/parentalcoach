@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { User, UserRole } from '@/types';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
-import { Plus, Search, Shield, Edit2, Loader2 } from 'lucide-react';
+import { Plus, Search, Shield, Edit2, Loader2, Eye, EyeOff } from 'lucide-react';
 
 const REGIONS: string[] = ['Oromia', 'Amhara', 'Tigray', 'SNNPR', 'Afar', 'Somali', 'Addis Ababa'];
 const ROLES: UserRole[]  = ['admin', 'supervisor', 'health_worker', 'data_clerk', 'viewer'];
@@ -14,12 +14,15 @@ const roleColors: Record<string, 'high' | 'medium' | 'low' | 'active' | 'default
 };
 
 interface NewUserForm {
-  name: string; email: string; phone: string;
+  name: string; email: string; phone: string; password: string;
   role: UserRole; region: string; woreda: string; kebele: string;
 }
 interface EditForm { role: UserRole; region: string; woreda: string; kebele: string; }
 
-const blankNew = (): NewUserForm => ({ name: '', email: '', phone: '', role: 'health_worker', region: 'Oromia', woreda: '', kebele: '' });
+const blankNew = (): NewUserForm => ({
+  name: '', email: '', phone: '', password: '',
+  role: 'health_worker', region: 'Oromia', woreda: '', kebele: '',
+});
 
 export default function UsersPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,6 +34,7 @@ export default function UsersPage() {
   const [selected,  setSelected]  = useState<User | null>(null);
   const [showNew,   setShowNew]   = useState(false);
   const [newForm,   setNewForm]   = useState<NewUserForm>(blankNew());
+  const [showPass,  setShowPass]  = useState(false);
   const [creating,  setCreating]  = useState(false);
   const [createMsg, setCreateMsg] = useState('');
   const [editForm,  setEditForm]  = useState<EditForm>({ role: 'health_worker', region: 'Oromia', woreda: '', kebele: '' });
@@ -60,24 +64,60 @@ export default function UsersPage() {
     u.role.toLowerCase().includes(search.toLowerCase())
   );
 
-  const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const roleCounts = users.reduce((acc, u) => {
+    acc[u.role] = (acc[u.role] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  // ── Create user via Supabase Auth (so auth.users UUID is set correctly) ──
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setCreating(true);
     setCreateMsg('');
-    const { error } = await sb.from('users').insert({
-      name: newForm.name, email: newForm.email, phone: newForm.phone || null,
-      role: newForm.role, region: newForm.region,
-      woreda: newForm.woreda || null, kebele: newForm.kebele || null,
+
+    // 1. Create the auth account — the handle_new_user trigger inserts into
+    //    public.users automatically with the correct UUID.
+    const { data: signUpData, error: signUpError } = await sb.auth.signUp({
+      email: newForm.email,
+      password: newForm.password,
+      options: {
+        data: {
+          name: newForm.name,
+          role: newForm.role,
+        },
+      },
     });
-    if (error) {
-      setCreateMsg(`Error: ${error.message}`);
-    } else {
-      setCreateMsg('Profile created. Ask them to sign up with this email on the login page.');
-      setNewForm(blankNew());
-      await loadUsers();
+
+    if (signUpError) {
+      setCreateMsg(`Error: ${signUpError.message}`);
+      setCreating(false);
+      return;
     }
+
+    const userId = signUpData?.user?.id;
+    if (!userId) {
+      setCreateMsg('Error: No user ID returned. The account may already exist.');
+      setCreating(false);
+      return;
+    }
+
+    // 2. Update the profile row with phone / location details that the trigger
+    //    doesn't set (it only sets name, email, role from metadata).
+    const { error: updateError } = await sb.from('users').update({
+      phone:  newForm.phone  || null,
+      region: newForm.region,
+      woreda: newForm.woreda || null,
+      kebele: newForm.kebele || null,
+    }).eq('id', userId);
+
+    if (updateError) {
+      setCreateMsg(`User created but profile update failed: ${updateError.message}`);
+    } else {
+      setCreateMsg('✓ User created successfully. They can now log in with their email and password.');
+      setNewForm(blankNew());
+    }
+
+    await loadUsers();
     setCreating(false);
   };
 
@@ -92,7 +132,8 @@ export default function UsersPage() {
     setSaving(true);
     setSaveMsg('');
     const { error } = await sb.from('users').update({
-      role: editForm.role, region: editForm.region, woreda: editForm.woreda, kebele: editForm.kebele,
+      role: editForm.role, region: editForm.region,
+      woreda: editForm.woreda, kebele: editForm.kebele,
     }).eq('id', selected.id);
     if (error) {
       setSaveMsg(`Error: ${error.message}`);
@@ -115,7 +156,7 @@ export default function UsersPage() {
             {loading ? 'Loading…' : `${users.length} system users`}
           </p>
         </div>
-        <button onClick={() => { setShowNew(true); setCreateMsg(''); }} className="btn-primary">
+        <button onClick={() => { setShowNew(true); setCreateMsg(''); setNewForm(blankNew()); }} className="btn-primary">
           <Plus size={14} /> Add User
         </button>
       </div>
@@ -172,12 +213,10 @@ export default function UsersPage() {
           </div>
         ) : (
           <div>
-            {/* Column headers */}
             <div className="grid px-3 pb-2 text-xs font-semibold uppercase"
               style={{ gridTemplateColumns: '2fr 1fr 2fr 1fr 1fr 36px', color: '#6b7280', letterSpacing: '0.05em' }}>
               <span>User</span><span>Role</span><span>Location</span><span>Phone</span><span>Joined</span><span />
             </div>
-
             <div className="space-y-0.5">
               {filtered.map(u => (
                 <div key={u.id}
@@ -309,6 +348,19 @@ export default function UsersPage() {
             <label className="form-label">Email *</label>
             <input className="form-input" type="email" required value={newForm.email}
               onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
+          </div>
+          <div>
+            <label className="form-label">Password *</label>
+            <div style={{ position: 'relative' }}>
+              <input className="form-input" type={showPass ? 'text' : 'password'} required minLength={6}
+                value={newForm.password} style={{ paddingRight: 40 }}
+                onChange={e => setNewForm(f => ({ ...f, password: e.target.value }))}
+                placeholder="Min. 6 characters" />
+              <button type="button" onClick={() => setShowPass(v => !v)}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex' }}>
+                {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="form-label">Phone</label>
