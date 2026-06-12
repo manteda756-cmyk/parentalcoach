@@ -1,7 +1,8 @@
 'use client';
 import React, { useState } from 'react';
-import { Search, Bell, Plus, Globe, ChevronDown, X } from 'lucide-react';
+import { Search, Bell, Plus, Globe, ChevronDown, X, Menu } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { useMobileNav } from './AppShell';
 import Link from 'next/link';
 
 const notifications = [
@@ -11,11 +12,11 @@ const notifications = [
 ];
 
 const quickAdd = [
-  { href: '/households/new', label: 'New Household',   icon: '🏠' },
-  { href: '/maternal/new',   label: 'Register Mother', icon: '🤰' },
-  { href: '/children/new',   label: 'Register Child',  icon: '👶' },
-  { href: '/visits/new',     label: 'New Visit Report',icon: '📋' },
-  { href: '/referrals/new',  label: 'New Referral',    icon: '↗️' },
+  { href: '/households/new', label: 'New Household',    icon: '🏠' },
+  { href: '/maternal/new',   label: 'Register Mother',  icon: '🤰' },
+  { href: '/children/new',   label: 'Register Child',   icon: '👶' },
+  { href: '/visits/new',     label: 'New Visit Report', icon: '📋' },
+  { href: '/referrals/new',  label: 'New Referral',     icon: '↗️' },
 ];
 
 const dotColor: Record<string, string> = {
@@ -26,16 +27,32 @@ const dotColor: Record<string, string> = {
 
 export default function TopBar() {
   const { language, setLanguage, currentUser, sidebarOpen } = useApp();
-  const [search,     setSearch]     = useState('');
-  const [notifOpen,  setNotifOpen]  = useState(false);
-  const [addOpen,    setAddOpen]    = useState(false);
+  const { mobileOpen, setMobileOpen } = useMobileNav();
+  const [search,    setSearch]    = useState('');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [addOpen,   setAddOpen]   = useState(false);
   const unread = notifications.filter(n => n.unread).length;
 
   return (
     <header className={`topbar${sidebarOpen ? '' : ' collapsed'}`}>
 
+      {/* ── Hamburger — mobile only ── */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label="Open menu"
+        style={{
+          display: 'none', // overridden by media query via inline style trick below
+          background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 8, padding: 7, cursor: 'pointer',
+          color: '#8b949e', flexShrink: 0, alignItems: 'center', justifyContent: 'center',
+        }}
+        className="mobile-menu-btn"
+      >
+        <Menu size={18} />
+      </button>
+
       {/* Search */}
-      <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+      <div style={{ position: 'relative', flex: 1, maxWidth: 360, minWidth: 0 }}>
         <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', pointerEvents: 'none' }} />
         <input
           type="text"
@@ -55,11 +72,12 @@ export default function TopBar() {
       </div>
 
       {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
 
-        {/* Language */}
+        {/* Language — hide on small screens */}
         <button
           onClick={() => setLanguage(language === 'en' ? 'am' : 'en')}
+          className="hide-mobile"
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
@@ -88,8 +106,8 @@ export default function TopBar() {
             }}
           >
             <Plus size={13} />
-            New
-            <ChevronDown size={11} style={{ transition: 'transform 0.15s', transform: addOpen ? 'rotate(180deg)' : 'none' }} />
+            <span className="hide-mobile">New</span>
+            <ChevronDown size={11} className="hide-mobile" style={{ transition: 'transform 0.15s', transform: addOpen ? 'rotate(180deg)' : 'none' }} />
           </button>
 
           {addOpen && (
@@ -208,7 +226,7 @@ export default function TopBar() {
         </div>
 
         {/* Avatar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 10, borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 8, borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{
             width: 30, height: 30, borderRadius: 8, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -218,14 +236,15 @@ export default function TopBar() {
           }}>
             {currentUser?.name?.[0] ?? 'U'}
           </div>
-          {currentUser && (
-            <div style={{ display: 'none' }} className="md-show">
-              <p style={{ color: '#e6edf3', fontSize: 12, fontWeight: 600, margin: 0, lineHeight: 1.3 }}>{currentUser.name.split(' ')[0]}</p>
-              <p style={{ color: '#6b7280', fontSize: 11, margin: 0, textTransform: 'capitalize' }}>{currentUser.role.replace('_', ' ')}</p>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Inline style to show hamburger on mobile — avoids needing Tailwind breakpoint classes */}
+      <style>{`
+        @media (max-width: 767px) {
+          .mobile-menu-btn { display: flex !important; }
+        }
+      `}</style>
     </header>
   );
 }

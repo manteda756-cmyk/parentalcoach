@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useData } from '@/context/DataContext';
 import { useApp } from '@/context/AppContext';
-import { mockVisitReports, mockUsers } from '@/lib/mockData';
+import { useVisits } from '@/context/VisitContext';
 import type { Household } from '@/types';
 import Badge from '@/components/ui/Badge';
 import Table from '@/components/ui/Table';
@@ -20,6 +20,7 @@ const REGIONS  = ['Oromia', 'Amhara', 'Tigray', 'SNNPR', 'Afar', 'Somali', 'Addi
 export default function HouseholdsPage() {
   const { households, refresh } = useData();
   const { currentUser } = useApp();
+  const { visitReports } = useVisits();
 
   // Roles allowed to edit households: admin, supervisor, health_worker (HEW), data_clerk
   const canEdit = currentUser
@@ -133,7 +134,7 @@ export default function HouseholdsPage() {
   ];
 
   const householdVisits = selected
-    ? mockVisitReports.filter(r => r.householdId === selected.id)
+    ? visitReports.filter(r => r.householdId === selected.id)
         .sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime())
     : [];
 
@@ -492,7 +493,6 @@ export default function HouseholdsPage() {
               ) : (
                 <div className="space-y-3">
                   {householdVisits.map(r => {
-                    const hew = mockUsers.find(u => u.id === r.hewId);
                     const highFlags = r.riskFlags.filter(f => f.priority === 'high');
                     return (
                       <Link key={r.id} href={`/visits/${r.id}`}
@@ -523,7 +523,7 @@ export default function HouseholdsPage() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs" style={{ color: '#6b7280' }}>{r.visitDate} · HEW: {hew?.name ?? r.hewId}</p>
+                            <p className="text-xs" style={{ color: '#6b7280' }}>{r.visitDate} · HEW: {r.hewId.slice(0, 8)}…</p>
                           </div>
                           <span className="text-xs font-semibold" style={{ color: '#818cf8' }}>View →</span>
                         </div>

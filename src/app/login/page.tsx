@@ -23,12 +23,6 @@ export default function LoginPage() {
     else setError('Invalid email or password. Check your credentials and try again.');
   };
 
-  const demos = [
-    { email: 'almaz@health.gov.et',  role: 'Admin',         bg: 'linear-gradient(135deg,#ef4444,#b91c1c)' },
-    { email: 'tigist@health.gov.et', role: 'Supervisor',    bg: 'linear-gradient(135deg,#f59e0b,#b45309)' },
-    { email: 'abebe@health.gov.et',  role: 'Health Worker', bg: 'linear-gradient(135deg,#6366f1,#4f46e5)' },
-  ];
-
   const inputStyle: React.CSSProperties = {
     width: '100%', border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 8, padding: '11px 14px', fontSize: 14,
@@ -250,33 +244,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Demo accounts */}
-            <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ color: '#484f58', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center', marginBottom: 12 }}>
-                Demo Accounts
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {demos.map(acc => (
-                  <button
-                    key={acc.email}
-                    onClick={() => setEmail(acc.email)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'; }}
-                  >
-                    <span style={{ color: '#8b949e', fontSize: 13 }}>{acc.email}</span>
-                    <span style={{ color: 'white', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: acc.bg, flexShrink: 0 }}>
-                      {acc.role}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Demo accounts section removed */}
           </div>
         </div>
       </div>

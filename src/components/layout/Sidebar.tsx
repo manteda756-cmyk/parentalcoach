@@ -3,6 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { useMobileNav } from './AppShell';
 import {
   LayoutDashboard, Home, Heart, Baby, ArrowRightLeft,
   Calendar, BarChart3, Users, Settings, LogOut,
@@ -20,9 +21,9 @@ const navGroups = [
   {
     label: 'Registrations',
     items: [
-      { href: '/households', icon: Home,  label: 'Households',     labelAm: 'ቤተሰቦች',      roles: null },
-      { href: '/maternal',   icon: Heart, label: 'Maternal Health', labelAm: 'የእናቶች ጤና',   roles: null },
-      { href: '/children',   icon: Baby,  label: 'Child Health',    labelAm: 'የህፃናት ጤና',   roles: null },
+      { href: '/households', icon: Home,  label: 'Households',     labelAm: 'ቤተሰቦች',    roles: null },
+      { href: '/maternal',   icon: Heart, label: 'Maternal Health', labelAm: 'የእናቶች ጤና', roles: null },
+      { href: '/children',   icon: Baby,  label: 'Child Health',    labelAm: 'የህፃናት ጤና', roles: null },
     ]
   },
   {
@@ -30,8 +31,8 @@ const navGroups = [
     items: [
       { href: '/visits',           icon: ClipboardList,  label: 'Visit Reports', labelAm: 'ጉብኝቶች', roles: ['health_worker','supervisor','admin','data_clerk'] },
       { href: '/supervisor/queue', icon: CheckSquare,    label: 'Review Queue',  labelAm: 'ወረፋ',    roles: ['supervisor','admin'] },
-      { href: '/referrals',        icon: ArrowRightLeft, label: 'Referrals',     labelAm: 'ማስተላለፍ',  roles: null },
-      { href: '/appointments',     icon: Calendar,       label: 'Appointments',  labelAm: 'ቀጠሮዎች',  roles: null },
+      { href: '/referrals',        icon: ArrowRightLeft, label: 'Referrals',     labelAm: 'ማስተላለፍ', roles: null },
+      { href: '/appointments',     icon: Calendar,       label: 'Appointments',  labelAm: 'ቀጠሮዎች', roles: null },
     ]
   },
   {
@@ -44,7 +45,7 @@ const navGroups = [
     label: 'Admin',
     items: [
       { href: '/users',    icon: Users,    label: 'Users',    labelAm: 'ተጠቃሚዎች', roles: ['admin','supervisor'] },
-      { href: '/settings', icon: Settings, label: 'Settings', labelAm: 'ቅንብሮች',   roles: null },
+      { href: '/settings', icon: Settings, label: 'Settings', labelAm: 'ቅንብሮች',  roles: null },
     ]
   },
 ];
@@ -52,9 +53,15 @@ const navGroups = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { currentUser, logout, language, sidebarOpen, setSidebarOpen } = useApp();
+  const { mobileOpen, setMobileOpen } = useMobileNav();
+
+  const handleNavClick = () => {
+    // Close mobile drawer when a link is tapped
+    setMobileOpen(false);
+  };
 
   return (
-    <aside className={`sidebar${sidebarOpen ? '' : ' collapsed'}`}>
+    <aside className={`sidebar${sidebarOpen ? '' : ' collapsed'}${mobileOpen ? ' mobile-open' : ''}`}>
 
       {/* ── Logo ── */}
       <div style={{
@@ -79,8 +86,10 @@ export default function Sidebar() {
           </div>
         )}
 
+        {/* Desktop collapse toggle — hidden on mobile (mobile uses hamburger in topbar) */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="hide-mobile"
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: '#6b7280', padding: 6, borderRadius: 6, flexShrink: 0,
@@ -121,6 +130,7 @@ export default function Sidebar() {
                   <Link
                     key={href}
                     href={href}
+                    onClick={handleNavClick}
                     className={`sidebar-link${active ? ' active' : ''}${!sidebarOpen ? ' icon-only' : ''}`}
                     title={!sidebarOpen ? label : undefined}
                   >
