@@ -1,7 +1,8 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { createClient } from '@/lib/supabase/client';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, Activity, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
@@ -12,6 +13,31 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+
+  // Live stats from DB
+  const [stats, setStats] = useState({ households: '—', mothers: '—', children: '—' });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sb = createClient() as any;
+        const [hhRes, mRes, cRes] = await Promise.all([
+          sb.from('households').select('id', { count: 'exact', head: true }),
+          sb.from('maternal_records').select('id', { count: 'exact', head: true }),
+          sb.from('child_records').select('id', { count: 'exact', head: true }),
+        ]);
+        setStats({
+          households: (hhRes.count ?? 0).toLocaleString(),
+          mothers:    (mRes.count  ?? 0).toLocaleString(),
+          children:   (cRes.count  ?? 0).toLocaleString(),
+        });
+      } catch {
+        // silently keep dashes if fetch fails
+      }
+    };
+    void fetchStats();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,9 +137,9 @@ export default function LoginPage() {
           {/* Stats */}
           <div style={{ display: 'flex', gap: 16, marginTop: 40 }}>
             {[
-              { value: '1,248', label: 'Households', color: '#818cf8' },
-              { value: '330',   label: 'Mothers',    color: '#f472b6' },
-              { value: '412',   label: 'Children',   color: '#34d399' },
+              { value: stats.households, label: 'Households', color: '#818cf8' },
+              { value: stats.mothers,    label: 'Mothers',    color: '#f472b6' },
+              { value: stats.children,   label: 'Children',   color: '#34d399' },
             ].map(s => (
               <div key={s.label} style={{
                 padding: '16px 20px', borderRadius: 14, textAlign: 'center',
