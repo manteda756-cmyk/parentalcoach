@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Save, Send, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { mockHouseholds, mockMaternalRecords, mockChildren } from '@/lib/mockData';
+import { mockMaternalRecords, mockChildren } from '@/lib/mockData';
+import { useData } from '@/context/DataContext';
 import { useApp } from '@/context/AppContext';
 import RiskFlagAlert from '@/components/ui/RiskFlagAlert';
 import type {
@@ -108,7 +109,8 @@ export default function NewVisitForm() {
   const [childSections, setChildSections] = useState<ChildVisitSection[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
 
-  const household = mockHouseholds.find(h => h.id === householdId);
+  const { households } = useData();
+  const household = households.find(h => h.id === householdId);
   const householdMother = mockMaternalRecords.find(m => m.householdId === householdId);
   const householdChildren = mockChildren.filter(c => c.householdId === householdId);
 
@@ -246,7 +248,7 @@ export default function NewVisitForm() {
             <label className="form-label">Select Household *</label>
             <select className="form-input" value={householdId} onChange={e => setHouseholdId(e.target.value)}>
               <option value="">— Select a household —</option>
-              {mockHouseholds.map(h => (
+              {households.map(h => (
                 <option key={h.id} value={h.id}>{h.registrationNumber} — {h.headName}</option>
               ))}
             </select>
