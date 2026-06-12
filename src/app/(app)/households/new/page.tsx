@@ -1,16 +1,55 @@
 'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Home, MapPin, Save, Loader2, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Home, MapPin, Save, Loader2, CheckCircle, Plus, X, Users, Baby } from 'lucide-react';
 import Link from 'next/link';
 import { useData } from '@/context/DataContext';
 import { useApp } from '@/context/AppContext';
 import { createClient } from '@/lib/supabase/client';
 
-const STEPS = ['Basic Info', 'Location', 'Programs', 'Review'];
+const STEPS    = ['Basic Info', 'Location', 'Programs', 'Maternal', 'Children', 'Review'];
 const PROGRAMS = ['MCH', 'Nutrition', 'Immunization', 'WASH', 'Family Planning', 'TB/HIV'];
 const REGIONS  = ['Oromia', 'Amhara', 'Tigray', 'SNNPR', 'Afar', 'Somali', 'Addis Ababa'];
 
+// ── Types ───────────────────────────────────────────────────────────────────
+interface MaternalEntry {
+  id: string;
+  name: string;
+  age: string;
+  phone: string;
+  status: 'pregnant' | 'lactating' | 'both';
+  gestationalAge: string;
+}
+
+interface ChildEntry {
+  id: string;
+  name: string;
+  sex: 'male' | 'female';
+  dateOfBirth: string;
+  caregiverName: string;
+}
+
+const blankMaternal = (): MaternalEntry => ({
+  id: crypto.randomUUID(),
+  name: '', age: '', phone: '', status: 'pregnant', gestationalAge: '',
+});
+
+const blankChild = (): ChildEntry => ({
+  id: crypto.randomUUID(),
+  name: '', sex: 'male', dateOfBirth: '', caregiverName: '',
+});
+
+function calcAgeMonths(dob: string): number {
+  if (!dob) return 0;
+  const birth = new Date(dob);
+  const now   = new Date();
+  return Math.max(0, Math.floor(
+    (now.getFullYear() - birth.getFullYear()) * 12 +
+    (now.getMonth() - birth.getMonth())
+  ));
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 export default function NewHouseholdPage() {
   const router      = useRouter();
   const { refresh } = useData();
@@ -28,6 +67,12 @@ export default function NewHouseholdPage() {
     gpsLat: '', gpsLng: '',
   });
 
+  const [maternalList, setMaternalList] = useState<MaternalEntry[]>([]);
+  const [maternalDraft, setMaternalDraft] = useState<MaternalEntry>(blankMaternal());
+
+  const [childList, setChildList] = useState<ChildEntry[]>([]);
+  const [childDraft, setChildDraft] = useState<ChildEntry>(blankChild());
+
   const update = (k: string, v: string | string[]) =>
     setForm(f => ({ ...f, [k]: v }));
 
@@ -44,6 +89,27 @@ export default function NewHouseholdPage() {
     });
   };
 
+  // ── Maternal helpers ─────────────────────────────────────────────────────
+  const addMother = () => {
+    if (!maternalDraft.name || !maternalDraft.age) return;
+    setMaternalList(l => [...l, maternalDraft]);
+    setMaternalDraft(blankMaternal());
+  };
+
+  const removeMother = (id: string) =>
+    setMaternalList(l => l.filter(m => m.id !== id));
+
+  // ── Child helpers ────────────────────────────────────────────────────────
+  const addChild = () => {
+    if (!childDraft.name || !childDraft.dateOfBirth) return;
+    setChildList(l => [...l, childDraft]);
+    setChildDraft(blankChild());
+  };
+
+  const removeChild = (id: string) =>
+    setChildList(l => l.filter(c => c.id !== id));
+
+  // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -53,29 +119,30 @@ export default function NewHouseholdPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = createClient() as any;
 
-      // Generate a registration number: HH-YYYY-XXXX (unique enough for now)
       const regNum = `HH-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
 
       const payload = {
-        registration_number: regNum,
-        house_number:        form.houseNumber,
-        head_name:           form.headName,
-        phone:               form.phone,
-        region:              form.region,
-        woreda:              form.woreda,
-        kebele:              form.kebele,
-        vulnerability_status:form.vulnerabilityStatus,
-        programs:            form.programs,
-        members_count:       parseInt(form.membersCount) || 1,
-        registered_by:       currentUser?.id ?? null,
-        registered_at:       new Date().toISOString().split('T')[0],
-        gps_lat:             form.gpsLat ? parseFloat(form.gpsLat) : null,
-        gps_lng:             form.gpsLng ? parseFloat(form.gpsLng) : null,
+        registration_number:  regNum,
+        house_number:         form.houseNumber,
+        head_name:            form.headName,
+        phone:                form.phone,
+        region:               form.region,
+        woreda:               form.woreda,
+        kebele:               form.kebele,
+        vulnerability_status: form.vulnerabilityStatus,
+        programs:             form.programs,
+        members_count:        parseInt(form.membersCount) || 1,
+        registered_by:        currentUser?.id ?? null,
+        registered_at:        new Date().toISOString().split('T')[0],
+        gps_lat:              form.gpsLat ? parseFloat(form.gpsLat) : null,
+        gps_lng:              form.gpsLng ? parseFloat(form.gpsLng) : null,
       };
 
-      const { error: dbError } = await sb
+      const { data: hhData, error: dbError } = await sb
         .from('households')
-        .insert(payload);
+        .insert(payload)
+        .select('id')
+        .single();
 
       if (dbError) {
         setError(dbError.message);
@@ -83,7 +150,56 @@ export default function NewHouseholdPage() {
         return;
       }
 
-      // Refresh DataContext so the households list updates immediately
+      const householdId = hhData?.id;
+
+      // Insert maternal records
+      if (householdId && maternalList.length > 0) {
+        const maternalPayloads = maternalList.map(m => ({
+          household_id:               householdId,
+          name:                       m.name,
+          age:                        parseInt(m.age) || 0,
+          phone:                      m.phone,
+          status:                     m.status,
+          gestational_age:            m.status !== 'lactating' && m.gestationalAge
+                                        ? parseInt(m.gestationalAge)
+                                        : null,
+          risk_level:                 'low',
+          registered_by:              currentUser?.id ?? null,
+          region:                     form.region,
+          woreda:                     form.woreda,
+          kebele:                     form.kebele,
+          anc_visits:                 0,
+          pnc_visits:                 0,
+          depression_screening:       'not_done',
+          iron_folic_supplementation: false,
+          family_support:             'good',
+          nutrition_status:           'normal',
+          missed_appointments:        0,
+        }));
+        await sb.from('maternal_records').insert(maternalPayloads);
+      }
+
+      // Insert child records
+      if (householdId && childList.length > 0) {
+        const childPayloads = childList.map(c => ({
+          household_id:            householdId,
+          name:                    c.name,
+          sex:                     c.sex,
+          date_of_birth:           c.dateOfBirth,
+          age_months:              calcAgeMonths(c.dateOfBirth),
+          caregiver_name:          c.caregiverName,
+          risk_level:              'low',
+          registered_by:           currentUser?.id ?? null,
+          region:                  form.region,
+          woreda:                  form.woreda,
+          kebele:                  form.kebele,
+          nutrition_status:        'normal',
+          disability_screening:    'none',
+          child_protection_flags:  [],
+        }));
+        await sb.from('child_records').insert(childPayloads);
+      }
+
       await refresh();
       setSaved(true);
       setTimeout(() => router.push('/households'), 1200);
@@ -93,7 +209,7 @@ export default function NewHouseholdPage() {
     }
   };
 
-  // ── Saved confirmation ──────────────────────────────────────────────
+  // ── Saved confirmation ───────────────────────────────────────────────────
   if (saved) {
     return (
       <div className="max-w-2xl mx-auto flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
@@ -145,7 +261,7 @@ export default function NewHouseholdPage() {
                 <span className="text-xs font-medium" style={{ color: i <= step ? '#818cf8' : '#6b7280' }}>{s}</span>
               </button>
               {i < STEPS.length - 1 && (
-                <div className="flex-1 h-px mx-3" style={{ background: i < step ? '#6366f1' : 'rgba(255,255,255,0.08)' }} />
+                <div className="flex-1 h-px mx-2" style={{ background: i < step ? '#6366f1' : 'rgba(255,255,255,0.08)' }} />
               )}
             </React.Fragment>
           ))}
@@ -296,11 +412,208 @@ export default function NewHouseholdPage() {
             </>
           )}
 
-          {/* ── Step 3: Review ── */}
+          {/* ── Step 3: Maternal Members ── */}
           {step === 3 && (
             <>
-              <h2 className="font-bold mb-3" style={{ color: '#e6edf3' }}>Review & Submit</h2>
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(236,72,153,0.15)' }}>
+                  <Users size={14} style={{ color: '#f472b6' }} />
+                </div>
+                <div>
+                  <h2 className="font-bold" style={{ color: '#e6edf3' }}>Maternal Members</h2>
+                  <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Add pregnant or lactating mothers in this household</p>
+                </div>
+              </div>
+
+              {/* Draft form */}
+              <div className="rounded-xl p-4 space-y-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="form-label">Name *</label>
+                    <input className="form-input" value={maternalDraft.name}
+                      onChange={e => setMaternalDraft(d => ({ ...d, name: e.target.value }))}
+                      placeholder="Mother's full name" />
+                  </div>
+                  <div>
+                    <label className="form-label">Age *</label>
+                    <input className="form-input" type="number" min="10" max="60"
+                      value={maternalDraft.age}
+                      onChange={e => setMaternalDraft(d => ({ ...d, age: e.target.value }))}
+                      placeholder="e.g. 25" />
+                  </div>
+                  <div>
+                    <label className="form-label">Phone</label>
+                    <input className="form-input" type="tel" value={maternalDraft.phone}
+                      onChange={e => setMaternalDraft(d => ({ ...d, phone: e.target.value }))}
+                      placeholder="+251…" />
+                  </div>
+                  <div>
+                    <label className="form-label">Status *</label>
+                    <select className="form-input" value={maternalDraft.status}
+                      onChange={e => setMaternalDraft(d => ({ ...d, status: e.target.value as MaternalEntry['status'] }))}>
+                      <option value="pregnant">Pregnant</option>
+                      <option value="lactating">Lactating</option>
+                      <option value="both">Both</option>
+                    </select>
+                  </div>
+                  {maternalDraft.status !== 'lactating' && (
+                    <div>
+                      <label className="form-label">Gestational Age (weeks)</label>
+                      <input className="form-input" type="number" min="1" max="42"
+                        value={maternalDraft.gestationalAge}
+                        onChange={e => setMaternalDraft(d => ({ ...d, gestationalAge: e.target.value }))}
+                        placeholder="e.g. 20" />
+                    </div>
+                  )}
+                </div>
+                <button type="button" onClick={addMother} className="btn-primary w-full justify-center"
+                  disabled={!maternalDraft.name || !maternalDraft.age}>
+                  <Plus size={14} /> Add another mother
+                </button>
+              </div>
+
+              {/* Added mothers */}
+              {maternalList.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase" style={{ color: '#6b7280' }}>
+                    Added ({maternalList.length})
+                  </p>
+                  {maternalList.map(m => (
+                    <div key={m.id} className="flex items-center gap-3 rounded-xl px-4 py-3"
+                      style={{ background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.2)' }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(236,72,153,0.2)' }}>
+                        <span className="text-xs font-bold" style={{ color: '#f472b6' }}>{m.name[0]?.toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold" style={{ color: '#e6edf3' }}>{m.name}</p>
+                        <p className="text-xs" style={{ color: '#6b7280' }}>
+                          Age {m.age} · {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
+                          {m.gestationalAge ? ` · ${m.gestationalAge} wks GA` : ''}
+                          {m.phone ? ` · ${m.phone}` : ''}
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => removeMother(m.id)}
+                        className="p-1.5 rounded-lg flex-shrink-0 transition-all"
+                        style={{ color: '#6b7280' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; (e.currentTarget as HTMLElement).style.color = '#fca5a5'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {maternalList.length === 0 && (
+                <p className="text-sm text-center py-2" style={{ color: '#6b7280' }}>
+                  No maternal records added yet. This step is optional.
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ── Step 4: Children (0-6 yrs) ── */}
+          {step === 4 && (
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(59,130,246,0.15)' }}>
+                  <Baby size={14} style={{ color: '#60a5fa' }} />
+                </div>
+                <div>
+                  <h2 className="font-bold" style={{ color: '#e6edf3' }}>Children (0–6 years)</h2>
+                  <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Add children aged 0–6 years in this household</p>
+                </div>
+              </div>
+
+              {/* Draft form */}
+              <div className="rounded-xl p-4 space-y-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="form-label">Child Name *</label>
+                    <input className="form-input" value={childDraft.name}
+                      onChange={e => setChildDraft(d => ({ ...d, name: e.target.value }))}
+                      placeholder="Child's full name" />
+                  </div>
+                  <div>
+                    <label className="form-label">Sex *</label>
+                    <select className="form-input" value={childDraft.sex}
+                      onChange={e => setChildDraft(d => ({ ...d, sex: e.target.value as ChildEntry['sex'] }))}>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Date of Birth *</label>
+                    <input className="form-input" type="date"
+                      value={childDraft.dateOfBirth}
+                      max={new Date().toISOString().split('T')[0]}
+                      onChange={e => setChildDraft(d => ({ ...d, dateOfBirth: e.target.value }))} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="form-label">Caregiver Name *</label>
+                    <input className="form-input" value={childDraft.caregiverName}
+                      onChange={e => setChildDraft(d => ({ ...d, caregiverName: e.target.value }))}
+                      placeholder="Name of primary caregiver" />
+                  </div>
+                </div>
+                <button type="button" onClick={addChild} className="btn-primary w-full justify-center"
+                  disabled={!childDraft.name || !childDraft.dateOfBirth}>
+                  <Plus size={14} /> Add another child
+                </button>
+              </div>
+
+              {/* Added children */}
+              {childList.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase" style={{ color: '#6b7280' }}>
+                    Added ({childList.length})
+                  </p>
+                  {childList.map(c => (
+                    <div key={c.id} className="flex items-center gap-3 rounded-xl px-4 py-3"
+                      style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(59,130,246,0.2)' }}>
+                        <span className="text-xs font-bold" style={{ color: '#60a5fa' }}>{c.name[0]?.toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold" style={{ color: '#e6edf3' }}>{c.name}</p>
+                        <p className="text-xs" style={{ color: '#6b7280' }}>
+                          {c.sex.charAt(0).toUpperCase() + c.sex.slice(1)} · DOB {c.dateOfBirth} · {calcAgeMonths(c.dateOfBirth)} months
+                          {c.caregiverName ? ` · Caregiver: ${c.caregiverName}` : ''}
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => removeChild(c.id)}
+                        className="p-1.5 rounded-lg flex-shrink-0 transition-all"
+                        style={{ color: '#6b7280' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; (e.currentTarget as HTMLElement).style.color = '#fca5a5'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {childList.length === 0 && (
+                <p className="text-sm text-center py-2" style={{ color: '#6b7280' }}>
+                  No children added yet. This step is optional.
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ── Step 5: Review ── */}
+          {step === 5 && (
+            <>
+              <h2 className="font-bold mb-3" style={{ color: '#e6edf3' }}>Review &amp; Submit</h2>
+
+              {/* Household details */}
+              <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
                 {[
                   { label: 'Household Head',  value: form.headName },
                   { label: 'House Number',    value: form.houseNumber },
@@ -320,6 +633,41 @@ export default function NewHouseholdPage() {
                     <span className="font-semibold" style={{ color: '#e6edf3' }}>{item.value}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Maternal summary */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase mb-2" style={{ color: '#f472b6' }}>
+                  Maternal Members ({maternalList.length})
+                </p>
+                {maternalList.length === 0
+                  ? <p className="text-sm" style={{ color: '#6b7280' }}>None added</p>
+                  : maternalList.map(m => (
+                    <div key={m.id} className="flex items-center gap-2 py-2 text-sm"
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span className="font-semibold" style={{ color: '#e6edf3' }}>{m.name}</span>
+                      <span style={{ color: '#6b7280' }}>· Age {m.age} · {m.status}</span>
+                      {m.gestationalAge && <span style={{ color: '#6b7280' }}>· {m.gestationalAge} wks GA</span>}
+                    </div>
+                  ))
+                }
+              </div>
+
+              {/* Children summary */}
+              <div>
+                <p className="text-xs font-semibold uppercase mb-2" style={{ color: '#60a5fa' }}>
+                  Children 0–6 yrs ({childList.length})
+                </p>
+                {childList.length === 0
+                  ? <p className="text-sm" style={{ color: '#6b7280' }}>None added</p>
+                  : childList.map(c => (
+                    <div key={c.id} className="flex items-center gap-2 py-2 text-sm"
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span className="font-semibold" style={{ color: '#e6edf3' }}>{c.name}</span>
+                      <span style={{ color: '#6b7280' }}>· {c.sex} · {c.dateOfBirth} · Caregiver: {c.caregiverName || '—'}</span>
+                    </div>
+                  ))
+                }
               </div>
             </>
           )}
