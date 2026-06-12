@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 interface AppContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
+  authLoading: boolean;
   language: Language;
   sidebarOpen: boolean;
   login: (email: string, password: string) => Promise<boolean>;
@@ -19,6 +20,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true); // true until first session check completes
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -30,6 +32,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
         await loadUserProfile(authUser.id);
+      } else {
+        setAuthLoading(false); // no session — stop loading, stay unauthenticated
       }
     };
     loadSession();
@@ -41,6 +45,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         setCurrentUser(null);
         setIsAuthenticated(false);
+        setAuthLoading(false);
       }
     });
 
@@ -58,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (error || !data) {
       setIsAuthenticated(true);
+      setAuthLoading(false);
       return;
     }
 
@@ -74,6 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createdAt: data.created_at,
     });
     setIsAuthenticated(true);
+    setAuthLoading(false);
   };
 
   // ── Login ─────────────────────────────────────────────────────────────
@@ -92,7 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      currentUser, isAuthenticated, language, sidebarOpen,
+      currentUser, isAuthenticated, authLoading, language, sidebarOpen,
       login, logout, setLanguage, setSidebarOpen,
     }}>
       {children}
