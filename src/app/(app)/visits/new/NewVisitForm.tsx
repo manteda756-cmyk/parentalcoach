@@ -1,10 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Save, Send, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Save, Send, AlertTriangle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useData } from '@/context/DataContext';
 import { useApp } from '@/context/AppContext';
+import { useVisits } from '@/context/VisitContext';
+import { createClient } from '@/lib/supabase/client';
 import RiskFlagAlert from '@/components/ui/RiskFlagAlert';
 import type {
   MaternalVisitSection, ChildVisitSection, RiskFlag,
@@ -107,8 +109,11 @@ export default function NewVisitForm() {
   const [maternalSection, setMaternalSection] = useState<MaternalVisitSection | null>(null);
   const [childSections, setChildSections] = useState<ChildVisitSection[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const { households, maternalRecords, children: allChildren } = useData();
+  const { addVisitReport } = useVisits();
   const household = households.find(h => h.id === householdId);
   const householdMother = maternalRecords.find(m => m.householdId === householdId);
   const householdChildren = allChildren.filter(c => c.householdId === householdId);
@@ -166,11 +171,77 @@ export default function NewVisitForm() {
     return errs.length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    if (householdId) localStorage.removeItem(`draft_visit_${householdId}`);
-    alert('Visit report submitted to supervisor successfully!');
-    router.push('/visits');
+    if (!currentUser) { setSubmitError('Not authenticated.'); return; }
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = createClient() as any;
+      const flags = computeRiskFlags(maternalSection ?? undefined, childSections);
+
+      // Determine next visit number for this household
+      const { data: existing } = await sb
+        .from('visit_reports')
+        .select('visit_number')
+        .eq('household_id', householdId)
+        .order('visit_number', { ascending: false })
+        .limit(1);
+      const nextVisitNumber = existing && existing.length > 0 ? existing[0].visit_number + 1 : 1;
+
+      const { data: inserted, error: insertError } = await sb
+        .from('visit_reports')
+        .insert({
+          household_id:         householdId,
+          visit_number:         nextVisitNumber,
+          visit_date:           visitDate,
+          status:               'submitted',
+          vulnerability_status: vulnerability,
+          psnp_enrollment:      psnp,
+          cbhi_status:          cbhi,
+          tds_status:           tds,
+          maternal_section:     includeMaternal && maternalSection ? maternalSection : null,
+          child_sections:       childSections,
+          risk_flags:           flags,
+          hew_id:               currentUser.id,
+          submitted_at:         new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        setSubmitError(`Failed to submit: ${insertError.message}`);
+        setSubmitting(false);
+        return;
+      }
+
+      // Add to local state so list updates immediately without full refresh
+      addVisitReport({
+        id:                  inserted.id,
+        householdId:         inserted.household_id,
+        visitNumber:         inserted.visit_number,
+        visitDate:           inserted.visit_date,
+        status:              inserted.status,
+        vulnerabilityStatus: inserted.vulnerability_status,
+        psnpEnrollment:      inserted.psnp_enrollment,
+        cbhiStatus:          inserted.cbhi_status,
+        tdsStatus:           inserted.tds_status,
+        maternalSection:     inserted.maternal_section ?? undefined,
+        childSections:       inserted.child_sections ?? [],
+        riskFlags:           inserted.risk_flags ?? [],
+        hewId:               inserted.hew_id,
+        submittedAt:         inserted.submitted_at ?? undefined,
+        createdAt:           inserted.created_at,
+        updatedAt:           inserted.updated_at,
+      });
+
+      if (householdId) localStorage.removeItem(`draft_visit_${householdId}`);
+      router.push('/visits');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong');
+      setSubmitting(false);
+    }
   };
 
   const updateMaternal = (patch: Partial<MaternalVisitSection>) =>
@@ -648,19 +719,27 @@ export default function NewVisitForm() {
         <button type="button" onClick={() => step > 0 ? setStep(s => s - 1) : router.push('/visits')} className="btn-outline">
           {step === 0 ? 'Cancel' : '← Back'}
         </button>
-        <div className="flex gap-2">
-          <button type="button" onClick={saveDraft} className="btn-outline">
-            <Save size={15} /> Save Draft
-          </button>
-          {step < STEPS.length - 1 ? (
-            <button type="button" onClick={() => setStep(s => s + 1)} disabled={step === 0 && !householdId} className="btn-primary disabled:opacity-50">
-              Next →
-            </button>
-          ) : (
-            <button type="button" onClick={handleSubmit} className="btn-secondary">
-              <Send size={15} /> Submit to Supervisor
-            </button>
+        <div className="flex gap-2 flex-col items-end">
+          {submitError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">{submitError}</p>
           )}
+          <div className="flex gap-2">
+            <button type="button" onClick={saveDraft} className="btn-outline">
+              <Save size={15} /> Save Draft
+            </button>
+            {step < STEPS.length - 1 ? (
+              <button type="button" onClick={() => setStep(s => s + 1)} disabled={step === 0 && !householdId} className="btn-primary disabled:opacity-50">
+                Next →
+              </button>
+            ) : (
+              <button type="button" onClick={handleSubmit} className="btn-secondary" disabled={submitting}>
+                {submitting
+                  ? <><Loader2 size={15} className="animate-spin" /> Submitting…</>
+                  : <><Send size={15} /> Submit to Supervisor</>
+                }
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

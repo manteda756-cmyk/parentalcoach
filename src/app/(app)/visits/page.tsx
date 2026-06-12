@@ -1,10 +1,11 @@
 'use client';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, AlertTriangle, AlertCircle, Trash2, Send, Info } from 'lucide-react';
-import { mockHouseholds, mockUsers } from '@/lib/mockData';
+import { mockUsers } from '@/lib/mockData';
 import { useVisits } from '@/context/VisitContext';
+import { useData } from '@/context/DataContext';
 import { useApp } from '@/context/AppContext';
 import type { VisitReport } from '@/types';
 
@@ -37,6 +38,7 @@ function canSend(role: string, report: VisitReport, userId: string): boolean {
 export default function VisitsPage() {
   const router = useRouter();
   const { visitReports, deleteVisitReport, updateVisitReport } = useVisits();
+  const { households } = useData();
   const { currentUser } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<typeof FILTERS[number]>('all');
@@ -46,7 +48,7 @@ export default function VisitsPage() {
   const userId = currentUser?.id ?? '';
 
   const filtered = visitReports.filter(r => {
-    const hh = mockHouseholds.find(h => h.id === r.householdId);
+    const hh = households.find(h => h.id === r.householdId);
     const matchSearch = !search ||
       hh?.headName.toLowerCase().includes(search.toLowerCase()) ||
       hh?.registrationNumber.toLowerCase().includes(search.toLowerCase());
@@ -131,7 +133,6 @@ export default function VisitsPage() {
             </thead>
             <tbody>
               {filtered.map(r => {
-                const hh = mockHouseholds.find(h => h.id === r.householdId);
                 const hew = mockUsers.find(u => u.id === r.hewId);
                 const highFlags = r.riskFlags.filter(f => f.priority === 'high');
                 const mediumFlags = r.riskFlags.filter(f => f.priority === 'medium');
@@ -143,8 +144,8 @@ export default function VisitsPage() {
                     onClick={() => router.push(`/visits/${r.id}`)}>
                     <td className="py-3 px-3 font-mono font-bold text-blue-600">#{r.visitNumber}</td>
                     <td className="py-3 px-3">
-                      <p className="font-semibold text-slate-800">{hh?.headName ?? r.householdId}</p>
-                      <p className="text-xs text-slate-400">{hh?.registrationNumber}</p>
+                      <p className="font-semibold text-slate-800">{households.find(h => h.id === r.householdId)?.headName ?? r.householdId}</p>
+                      <p className="text-xs text-slate-400">{households.find(h => h.id === r.householdId)?.registrationNumber}</p>
                     </td>
                     <td className="py-3 px-3 text-slate-700">{r.visitDate}</td>
                     <td className="py-3 px-3 text-slate-600 text-xs">{hew?.name ?? r.hewId}</td>
