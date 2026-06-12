@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Save, Send, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { mockMaternalRecords, mockChildren } from '@/lib/mockData';
 import { useData } from '@/context/DataContext';
 import { useApp } from '@/context/AppContext';
 import RiskFlagAlert from '@/components/ui/RiskFlagAlert';
@@ -109,10 +108,10 @@ export default function NewVisitForm() {
   const [childSections, setChildSections] = useState<ChildVisitSection[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
 
-  const { households } = useData();
+  const { households, maternalRecords, children: allChildren } = useData();
   const household = households.find(h => h.id === householdId);
-  const householdMother = mockMaternalRecords.find(m => m.householdId === householdId);
-  const householdChildren = mockChildren.filter(c => c.householdId === householdId);
+  const householdMother = maternalRecords.find(m => m.householdId === householdId);
+  const householdChildren = allChildren.filter(c => c.householdId === householdId);
 
   // Restore draft from localStorage
   useEffect(() => {
